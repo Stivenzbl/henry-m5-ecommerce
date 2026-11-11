@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingBag, ShieldCheck, User, RefreshCw, Menu, X as CloseIcon } from 'lucide-react';
+import { ShoppingBag, ShieldCheck, User, Menu, X as CloseIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 
@@ -7,10 +7,11 @@ interface NavbarProps {
   currentView: 'catalog' | 'orders' | 'admin';
   onNavigate: (view: 'catalog' | 'orders' | 'admin') => void;
   onOpenCart: () => void;
+  onOpenLogin: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenCart }) => {
-  const { user, switchRole } = useAuth();
+export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenCart, onOpenLogin }) => {
+  const { user } = useAuth();
   const { state: cartState } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -80,22 +81,38 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenC
         {/* Right Actions */}
         <div className="flex items-center space-x-2 sm:space-x-3">
           
-          {/* Role Switcher pill (Explicit Demo indicator) */}
-          <button
-            onClick={switchRole}
-            title="Alternar rol de pruebas (Demostración local)"
-            className="flex items-center space-x-1 px-2.5 py-1 text-[11px] font-medium rounded-full border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition shadow-xs"
-          >
-            <RefreshCw className="w-3 h-3 text-slate-400" />
-            <span className="text-slate-400 font-normal">[Demo]</span>
-            <span>Rol: <strong className={user?.role === 'admin' ? 'text-purple-600' : 'text-indigo-600'}>{user?.role}</strong></span>
-          </button>
-
-          {/* User info */}
-          <div className="hidden md:flex items-center space-x-2 text-slate-600 text-xs">
-            <User className="w-4 h-4 text-slate-400" />
-            <span className="truncate max-w-[120px] font-medium">{user?.displayName}</span>
-          </div>
+          {/* User Authentication Pill / Login Button */}
+          {user ? (
+            <button
+              onClick={onOpenLogin}
+              title="Administrar sesión y roles de usuario"
+              className="flex items-center space-x-2 px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 transition shadow-xs group"
+            >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${
+                user.role === 'admin' ? 'bg-purple-600' : 'bg-indigo-600'
+              }`}>
+                {user.role === 'admin' ? <ShieldCheck className="w-3 h-3" /> : <User className="w-3 h-3" />}
+              </div>
+              <div className="flex items-center space-x-1 text-xs">
+                <span className="font-semibold text-slate-800 hidden md:inline max-w-[100px] truncate">
+                  {user.displayName}
+                </span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                  user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'
+                }`}>
+                  {user.role}
+                </span>
+              </div>
+            </button>
+          ) : (
+            <button
+              onClick={onOpenLogin}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-sm"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Iniciar Sesión</span>
+            </button>
+          )}
 
           {/* Cart button */}
           <button
@@ -161,9 +178,33 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenC
             </button>
           )}
 
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 px-1">
-            <span>Usuario: {user?.displayName}</span>
-            <span className="capitalize font-semibold text-indigo-600">({user?.role})</span>
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs px-1">
+            {user ? (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenLogin();
+                }}
+                className="flex items-center space-x-2 text-slate-700 font-medium hover:text-indigo-600 transition"
+              >
+                <span>{user.displayName}</span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                  user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'
+                }`}>
+                  {user.role}
+                </span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenLogin();
+                }}
+                className="font-semibold text-indigo-600 hover:text-indigo-700"
+              >
+                Iniciar Sesión
+              </button>
+            )}
           </div>
         </div>
       )}

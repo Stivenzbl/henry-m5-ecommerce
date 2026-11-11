@@ -4,7 +4,7 @@ import { UserProfile, UserRole } from '../types/user';
 interface AuthContextValue {
   user: UserProfile | null;
   isLoading: boolean;
-  loginAs: (role: UserRole) => void;
+  loginAs: (role: UserRole, customName?: string, customEmail?: string) => void;
   logout: () => void;
   switchRole: () => void;
 }
@@ -39,11 +39,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const loginAs = (role: UserRole) => {
+  const loginAs = (role: UserRole, customName?: string, customEmail?: string) => {
     const newUser: UserProfile = {
       uid: role === 'admin' ? 'admin-root-001' : 'user-default-101',
-      email: role === 'admin' ? 'admin@patagonix.com' : 'cliente@patagonix.com',
-      displayName: role === 'admin' ? 'Admin Stiven' : 'Stiven Zabala',
+      email: customEmail || (role === 'admin' ? 'admin@patagonix.com' : 'cliente@patagonix.com'),
+      displayName: customName || (role === 'admin' ? 'Admin Stiven' : 'Stiven Zabala'),
       role,
       createdAt: new Date().toISOString(),
     };

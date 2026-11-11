@@ -5,17 +5,22 @@ import { OrdersView } from './pages/OrdersView';
 import { AdminView } from './pages/AdminView';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './pages/CheckoutModal';
+import { LoginModal } from './components/LoginModal';
 import { useAuth } from './contexts/AuthContext';
+import { UserRole } from './types/user';
 
 export const App: React.FC = () => {
   const { user } = useAuth();
   const [currentView, setCurrentView] = useState<'catalog' | 'orders' | 'admin'>('catalog');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [requiredRoleForLogin, setRequiredRoleForLogin] = useState<UserRole | undefined>(undefined);
 
   const handleNavigate = (view: 'catalog' | 'orders' | 'admin') => {
     if (view === 'admin' && user?.role !== 'admin') {
-      alert('Acceso restringido: Esta vista requiere rol de administrador.');
+      setRequiredRoleForLogin('admin');
+      setIsLoginOpen(true);
       return;
     }
     setCurrentView(view);
@@ -34,6 +39,10 @@ export const App: React.FC = () => {
         currentView={currentView}
         onNavigate={handleNavigate}
         onOpenCart={() => setIsCartOpen(true)}
+        onOpenLogin={() => {
+          setRequiredRoleForLogin(undefined);
+          setIsLoginOpen(true);
+        }}
       />
 
       {/* Main Container */}
@@ -58,6 +67,13 @@ export const App: React.FC = () => {
           // Switch to orders view on successful purchase
           setCurrentView('orders');
         }}
+      />
+
+      {/* Login & Role Switcher Modal */}
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        requiredRole={requiredRoleForLogin}
       />
 
       {/* Footer */}
