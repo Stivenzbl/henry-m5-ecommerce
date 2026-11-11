@@ -26,6 +26,7 @@ export const AdminProductModal: React.FC<AdminProductModalProps> = ({
   const [stock, setStock] = useState('10');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -50,8 +51,6 @@ export const AdminProductModal: React.FC<AdminProductModalProps> = ({
   }, [productToEdit, isOpen]);
 
   if (!isOpen) return null;
-
-  const [uploadMessage, setUploadMessage] = useState<string>('');
 
   // Real or simulated S3 presigned URL workflow
   const handleS3Upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
