@@ -18,10 +18,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const { state: cartState, clearCart } = useCart();
   const { user } = useAuth();
 
-  const [street, setStreet] = useState('Av. Siempre Viva 742');
-  const [city, setCity] = useState('Santiago');
-  const [country, setCountry] = useState('Chile');
-  const [postalCode, setPostalCode] = useState('7500000');
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('');
+  const [country, setCountry] = useState('Colombia');
+  const [postalCode, setPostalCode] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<string | null>(null);
 
@@ -78,7 +78,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
               <h3 className="text-2xl font-bold text-slate-900">¡Orden Confirmada!</h3>
               <p className="text-sm text-slate-500 max-w-sm mx-auto">
-                Tu orden <strong>#{completedOrder}</strong> ha sido creada exitosamente en Firestore con estado <strong>pending</strong>.
+                Tu orden <strong>#{completedOrder}</strong> ha sido registrada exitosamente en el historial con estado <strong>pending</strong>.
               </p>
               
               <div className="pt-4">
@@ -92,6 +92,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           ) : (
             <form onSubmit={handleConfirmOrder} className="space-y-5">
+              <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900">
+                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Modo Demostración Activo:</strong> Las órdenes se registran en el historial de sesión local. No se requiere tarjeta de crédito ni se realizan cobros reales.
+                </span>
+              </div>
+
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 block">
                   Simulación de Checkout
@@ -120,6 +127,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     required
                     value={street}
                     onChange={e => setStreet(e.target.value)}
+                    placeholder="Ej. Carrera 15 #85-30"
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                 </div>
@@ -132,6 +140,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       required
                       value={city}
                       onChange={e => setCity(e.target.value)}
+                      placeholder="Ej. Bogotá"
                       className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                   </div>
@@ -142,6 +151,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       required
                       value={country}
                       onChange={e => setCountry(e.target.value)}
+                      placeholder="Ej. Colombia"
                       className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                   </div>
@@ -152,6 +162,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       required
                       value={postalCode}
                       onChange={e => setPostalCode(e.target.value)}
+                      placeholder="Ej. 110221"
                       className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                   </div>

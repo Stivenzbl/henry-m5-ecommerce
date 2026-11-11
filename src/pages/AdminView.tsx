@@ -230,6 +230,15 @@ export const AdminView: React.FC = () => {
           {activeTab === 'analytics' && (
             <div className="space-y-6">
               
+              {/* Truthful demo mode indicator */}
+              <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 px-4 py-2.5 rounded-xl text-xs text-slate-600">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <strong>Analytics en Tiempo Real:</strong> Métricas calculadas sobre el estado de órdenes en demostración local.
+                </span>
+                <span className="text-[11px] text-slate-400 font-mono">Extra Credit 1</span>
+              </div>
+
               {/* KPI Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 

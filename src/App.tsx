@@ -63,7 +63,7 @@ export const App: React.FC = () => {
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 mt-12 py-8 text-center text-xs text-slate-400">
         <p>Patagonix Tech Retail © 2026 · Proyecto Integrador M5 Front-End (Full Stack IA)</p>
-        <p className="mt-1">React 18 + TypeScript + Vite + Firebase Firestore + AWS S3 Presigned URLs</p>
+        <p className="mt-1">React 18 + TypeScript + Vite + Tailwind CSS · Arquitectura Modular Serverless & Demo Ready</p>
       </footer>
     </div>
   );

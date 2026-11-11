@@ -298,8 +298,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           {rev.userName.charAt(0).toUpperCase()}
                         </div>
                         <span className="text-xs font-bold text-slate-800">{rev.userName}</span>
-                        <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold">
-                          Comprador verificado
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                          rev.isVerifiedBuyer 
+                            ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' 
+                            : 'text-slate-600 bg-slate-100 border border-slate-200'
+                        }`}>
+                          {rev.isVerifiedBuyer ? 'Comprador verificado' : 'Opinión de muestra'}
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-400">

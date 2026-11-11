@@ -1,5 +1,5 @@
-import React from 'react';
-import { ShoppingBag, ShieldCheck, User, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShoppingBag, ShieldCheck, User, RefreshCw, Menu, X as CloseIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 
@@ -12,6 +12,12 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenCart }) => {
   const { user, switchRole } = useAuth();
   const { state: cartState } = useCart();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleMobileNav = (view: 'catalog' | 'orders' | 'admin') => {
+    onNavigate(view);
+    setMobileMenuOpen(false);
+  };
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
@@ -32,7 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenC
           </div>
         </div>
 
-        {/* Navigation links */}
+        {/* Desktop Navigation links */}
         <nav className="hidden sm:flex items-center space-x-1">
           <button
             onClick={() => onNavigate('catalog')}
@@ -72,15 +78,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenC
         </nav>
 
         {/* Right Actions */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           
-          {/* Role Switcher pill */}
+          {/* Role Switcher pill (Explicit Demo indicator) */}
           <button
             onClick={switchRole}
-            title="Alternar rol para pruebas (Customer / Admin)"
-            className="flex items-center space-x-1.5 px-2.5 py-1 text-xs rounded-full border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition"
+            title="Alternar rol de pruebas (Demostración local)"
+            className="flex items-center space-x-1 px-2.5 py-1 text-[11px] font-medium rounded-full border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition shadow-xs"
           >
-            <RefreshCw className="w-3 h-3 text-slate-500" />
+            <RefreshCw className="w-3 h-3 text-slate-400" />
+            <span className="text-slate-400 font-normal">[Demo]</span>
             <span>Rol: <strong className={user?.role === 'admin' ? 'text-purple-600' : 'text-indigo-600'}>{user?.role}</strong></span>
           </button>
 
@@ -103,8 +110,63 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenC
               </span>
             )}
           </button>
+
+          {/* Mobile hamburger menu toggle */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="sm:hidden p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition focus:outline-none"
+            aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú móvil'}
+          >
+            {mobileMenuOpen ? <CloseIcon className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile navigation drawer / dropdown */}
+      {mobileMenuOpen && (
+        <div className="sm:hidden border-t border-slate-100 bg-white/98 backdrop-blur-md px-4 pt-2 pb-4 space-y-1 shadow-lg animate-in slide-in-from-top-2 duration-150">
+          <button
+            onClick={() => handleMobileNav('catalog')}
+            className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition ${
+              currentView === 'catalog'
+                ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                : 'text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Catálogo
+          </button>
+
+          <button
+            onClick={() => handleMobileNav('orders')}
+            className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition ${
+              currentView === 'orders'
+                ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                : 'text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Mis Órdenes
+          </button>
+
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => handleMobileNav('admin')}
+              className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition flex items-center space-x-2 ${
+                currentView === 'admin'
+                  ? 'bg-purple-100 text-purple-800 font-semibold'
+                  : 'text-purple-700 hover:bg-purple-50'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Panel Admin</span>
+            </button>
+          )}
+
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 px-1">
+            <span>Usuario: {user?.displayName}</span>
+            <span className="capitalize font-semibold text-indigo-600">({user?.role})</span>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

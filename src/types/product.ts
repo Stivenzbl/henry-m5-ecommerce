@@ -8,6 +8,7 @@ export interface Review {
   rating: number; // 1 to 5
   comment: string;
   createdAt: string;
+  isVerifiedBuyer?: boolean;
 }
 
 export interface Product {
