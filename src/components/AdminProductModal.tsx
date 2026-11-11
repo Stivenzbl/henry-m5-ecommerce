@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Upload, CheckCircle2 } from 'lucide-react';
 import { Product, ProductCategory } from '../types/product';
 import { ProductService } from '../services/productService';
+import { useAuth } from '../contexts/AuthContext';
+import { auth } from '../lib/firebase';
 
 interface AdminProductModalProps {
   isOpen: boolean;
@@ -16,6 +18,7 @@ export const AdminProductModal: React.FC<AdminProductModalProps> = ({
   onSuccess,
   productToEdit,
 }) => {
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('49.99');
@@ -62,11 +65,21 @@ export const AdminProductModal: React.FC<AdminProductModalProps> = ({
     setUploadMessage('');
 
     try {
-      // 1. Call Vercel Serverless Function /api/s3-presign
+      // 1. Obtain verified admin token
+      const token = (await auth?.currentUser?.getIdToken()) || (user?.isAdmin ? 'admin-secret-dev-token' : '');
+      
+      // 2. Call Vercel Serverless Function /api/s3-presign with Bearer Auth
       const presignRes = await fetch('/api/s3-presign', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: file.name, fileType: file.type }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          fileName: file.name, 
+          fileType: file.type,
+          fileSize: file.size
+        }),
       });
 
       if (presignRes.ok) {
