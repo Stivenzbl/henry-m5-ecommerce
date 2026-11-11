@@ -4,6 +4,8 @@
 > **Software Factory:** Patagonix Tech  
 > **Cliente:** Retail Client (Comercio Electrónico B2C & B2B)  
 > **Autor:** Stiven Zabala  
+> **Despliegue Vercel:** [https://henry-m5-ecommerce.vercel.app](https://henry-m5-ecommerce.vercel.app)  
+> **Repositorio GitHub:** [https://github.com/Stivenzbl/henry-m5-ecommerce](https://github.com/Stivenzbl/henry-m5-ecommerce)  
 
 ---
 
