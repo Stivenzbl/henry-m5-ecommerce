@@ -1,9 +1,14 @@
 export type UserRole = 'customer' | 'admin';
 
-export interface UserProfile {
+export interface AuthenticatedUser {
   uid: string;
   email: string;
   displayName: string;
   role: UserRole;
-  createdAt: string;
+  isAdmin: boolean;
+  photoURL?: string | null;
+  createdAt?: string;
+  customClaims?: Record<string, any>;
 }
+
+export interface UserProfile extends AuthenticatedUser {}

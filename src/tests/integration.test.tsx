@@ -24,8 +24,8 @@ const ShoppingSimulationComponent: React.FC = () => {
 
   return (
     <div>
-      <div data-testid="user-role">{user?.role}</div>
-      <div data-testid="user-email">{user?.email}</div>
+      <div data-testid="user-role">{user?.role || 'unauthenticated'}</div>
+      <div data-testid="user-email">{user?.email || 'none'}</div>
       <div data-testid="cart-count">{state.totalQuantity}</div>
       <div data-testid="cart-total">{state.totalPrice}</div>
 
@@ -49,13 +49,14 @@ describe('Full E-Commerce User Flow Integration', () => {
     localStorage.clear();
   });
 
-  it('initializes with default customer session and empty cart', async () => {
+  it('initializes truthfully in unauthenticated visitor state with empty cart (no fake user)', async () => {
     renderWithProviders(<ShoppingSimulationComponent />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('user-role').textContent).toBe('customer');
+      expect(screen.getByTestId('user-role').textContent).toBe('unauthenticated');
     });
 
+    expect(screen.getByTestId('user-email').textContent).toBe('none');
     expect(screen.getByTestId('cart-count').textContent).toBe('0');
     expect(screen.getByTestId('cart-total').textContent).toBe('0');
   });
@@ -82,9 +83,10 @@ describe('Full E-Commerce User Flow Integration', () => {
   });
 
   it('creates an order successfully in OrderService and clears cart', async () => {
+    const testUid = 'user-auth-real-999';
     const order = await OrderService.createOrder({
-      userId: 'user-default-101',
-      userEmail: 'cliente@patagonix.com',
+      userId: testUid,
+      userEmail: 'cliente.verificado@patagonix.com',
       items: [{ product: sampleProduct, quantity: 2 }],
       totalPrice: 3998.0,
       totalQuantity: 2,
@@ -102,7 +104,7 @@ describe('Full E-Commerce User Flow Integration', () => {
     expect(order.items.length).toBe(1);
 
     // Query orders for user
-    const userOrders = await OrderService.getOrdersByUser('user-default-101');
+    const userOrders = await OrderService.getOrdersByUser(testUid);
     expect(userOrders.length).toBeGreaterThanOrEqual(1);
     expect(userOrders[0].id).toBe(order.id);
   });

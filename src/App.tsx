@@ -1,86 +1,81 @@
 import React, { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { CatalogView } from './pages/CatalogView';
 import { OrdersView } from './pages/OrdersView';
 import { AdminView } from './pages/AdminView';
+import { LoginView } from './pages/LoginView';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './pages/CheckoutModal';
-import { LoginModal } from './components/LoginModal';
-import { useAuth } from './contexts/AuthContext';
-import { UserRole } from './types/user';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
-export const App: React.FC = () => {
-  const { user } = useAuth();
-  const [currentView, setCurrentView] = useState<'catalog' | 'orders' | 'admin'>('catalog');
+const AppLayout: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [requiredRoleForLogin, setRequiredRoleForLogin] = useState<UserRole | undefined>(undefined);
-
-  const handleNavigate = (view: 'catalog' | 'orders' | 'admin') => {
-    if (view === 'admin' && user?.role !== 'admin') {
-      setRequiredRoleForLogin('admin');
-      setIsLoginOpen(true);
-      return;
-    }
-    setCurrentView(view);
-  };
-
-  const handleProceedToCheckout = () => {
-    setIsCartOpen(false);
-    setIsCheckoutOpen(true);
-  };
+  const location = useLocation();
+  const isLoginPage = location.pathname === '/login';
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      
-      {/* Top Navbar */}
-      <Navbar
-        currentView={currentView}
-        onNavigate={handleNavigate}
-        onOpenCart={() => setIsCartOpen(true)}
-        onOpenLogin={() => {
-          setRequiredRoleForLogin(undefined);
-          setIsLoginOpen(true);
-        }}
-      />
+    <div className="min-h-screen bg-slate-50 dark:bg-gray-900 flex flex-col font-sans transition-colors">
+      {!isLoginPage && (
+        <Navbar onOpenCart={() => setIsCartOpen(true)} />
+      )}
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {currentView === 'catalog' && <CatalogView />}
-        {currentView === 'orders' && <OrdersView />}
-        {currentView === 'admin' && <AdminView />}
+      <main className={isLoginPage ? 'flex-1' : 'flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8'}>
+        <Routes>
+          <Route path="/" element={<CatalogView />} />
+          <Route path="/catalog" element={<Navigate to="/" replace />} />
+          <Route path="/login" element={<LoginView />} />
+          <Route 
+            path="/orders" 
+            element={
+              <ProtectedRoute>
+                <OrdersView />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminView />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
-      {/* Cart Slide-Over */}
       <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
-        onProceedToCheckout={handleProceedToCheckout}
+        onProceedToCheckout={() => {
+          setIsCartOpen(false);
+          setIsCheckoutOpen(true);
+        }}
       />
 
-      {/* Checkout Modal */}
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         onOrderSuccess={() => {
-          // Switch to orders view on successful purchase
-          setCurrentView('orders');
+          // Handled within modal
         }}
       />
 
-      {/* Login & Role Switcher Modal */}
-      <LoginModal
-        isOpen={isLoginOpen}
-        onClose={() => setIsLoginOpen(false)}
-        requiredRole={requiredRoleForLogin}
-      />
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 mt-12 py-8 text-center text-xs text-slate-400">
-        <p>Patagonix Tech Retail © 2026 · Proyecto Integrador M5 Front-End (Full Stack IA)</p>
-        <p className="mt-1">React 18 + TypeScript + Vite + Tailwind CSS · Arquitectura Modular Serverless & Demo Ready</p>
-      </footer>
+      {!isLoginPage && (
+        <footer className="bg-white dark:bg-gray-800 border-t border-slate-200 dark:border-gray-700 mt-12 py-8 text-center text-xs text-slate-500 dark:text-gray-400">
+          <p>© 2026 Patagonix Retail — E-Commerce Enterprise Architecture · Stiven Zabala</p>
+        </footer>
+      )}
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <BrowserRouter>
+      <AppLayout />
+    </BrowserRouter>
   );
 };
