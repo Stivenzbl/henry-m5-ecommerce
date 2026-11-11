@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function: verifies user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function: checks if user has admin role in Firestore
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // Helper function: verifies ownership of document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Products collection:
+    // Anyone (even unauthenticated customers) can view products.
+    // Only administrators can create, update, or delete products.
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+
+      // Subcollection: Product reviews
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if isAdmin() || isOwner(resource.data.userId);
+      }
+    }
+
+    // Users collection:
+    // Each user can read/write their own profile; admins can read all profiles.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      // Only admin can change role field
+      allow update: if isOwner(userId) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Orders collection:
+    // Customers can only create and read their own orders.
+    // Admins have full access to view, filter, and change status of all orders.
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin(); // Status transitions (pending -> processing -> completed / cancelled)
+      allow delete: if isAdmin();
+    }
+  }
+}
