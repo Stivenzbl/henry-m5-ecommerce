@@ -7,7 +7,7 @@
 > **Cohorte:** `webpt35`  
 > **Estado de Entrega Oficial:** ✅ **ENTREGADO EN PLATAFORMA SOY HENRY** (`Status: 200 OK`)  
 > **Rama de Entrega Oficial:** `main` (Preservada en commit `692f064`)  
-> **Rama de Hardening y Calidad:** `hardening/m5-auth-rbac-data`  
+> **Rama de Hardening y Calidad:** `hardening/enterprise-security-core`  
 > **Despliegue Vercel:** [https://henry-m5-ecommerce.vercel.app](https://henry-m5-ecommerce.vercel.app)  
 > **Repositorio GitHub:** [https://github.com/Stivenzbl/henry-m5-ecommerce](https://github.com/Stivenzbl/henry-m5-ecommerce)  
 
@@ -34,7 +34,7 @@ Patagonix Tech ha desarrollado una **Single Page Application (SPA)** de comercio
 - **Frontend SPA:** React 18 + TypeScript + Vite + Tailwind CSS + Lucide Icons + React Router DOM (^7.18.5).
 - **Backend as a Service (BaaS):** Firebase (Authentication + Firestore) con hidratación de Custom Claims server-side.
 - **Serverless Cloud:** Vercel Serverless Functions (`/api/s3-presign`) con Bearer Auth + AWS S3 para subida directa de archivos binarios.
-- **Testing Suite:** Vitest + React Testing Library + JSDOM con **28 pruebas automatizadas** cubriendo reducers, hooks aislados (`renderHook`), guards de ruta, integración de compra y seguridad API.
+- **Testing Suite:** Vitest + React Testing Library + JSDOM con **32 pruebas automatizadas** cubriendo reducers, hooks aislados (`renderHook`), guards de ruta, integración de compra con integridad de precios, y compuertas de seguridad API.
 - **Hosting & CI/CD:** Vercel Edge Network con variables de entorno seguras y control de versiones semántico en GitHub.
 
 ---
@@ -46,10 +46,12 @@ El proyecto implementa una arquitectura modular orientada al dominio (*Screaming
 ```text
 henry_proyecto_m5_ecommerce/
 ├── api/
-│   └── s3-presign.ts         # Vercel Serverless Function (Firma HMAC-SHA256 con Bearer Auth)
+│   ├── lib/
+│   │   └── verifyAuth.ts     # Verificación criptográfica RS256 con Google JWKS (`jose`)
+│   └── s3-presign.ts         # Serverless Function: Presigned POST con directiva content-length-range
 ├── src/
 │   ├── components/           # Componentes UI reutilizables
-│   │   ├── AdminProductModal.tsx   # Modal CRUD + Upload a S3
+│   │   ├── AdminProductModal.tsx   # Modal CRUD + Upload a S3 con Presigned POST
 │   │   ├── CartDrawer.tsx          # Drawer lateral del carrito
 │   │   ├── ForbiddenView.tsx       # Vista 403 Forbidden para clientes en /admin
 │   │   ├── Navbar.tsx              # Barra de navegación con perfil y sesión
@@ -73,25 +75,25 @@ henry_proyecto_m5_ecommerce/
 │   ├── pages/                # Vistas principales del sistema
 │   │   ├── AdminView.tsx           # Panel de control con Analytics (Extra Credit 1) y CRUD
 │   │   ├── CatalogView.tsx         # Catálogo paginado (Extra Credit 2) y filtros
-│   │   ├── CheckoutModal.tsx       # Flujo de pago y creación de órdenes
-│   │   ├── LoginView.tsx           # Página editorial de login responsive de 2 columnas
+│   │   ├── CheckoutModal.tsx       # Flujo de pago y creación de órdenes con feedback
+│   │   ├── LoginView.tsx           # Página editorial de login responsive (cero credenciales en duro)
 │   │   └── OrdersView.tsx          # Historial de compras filtradas por usuario
 │   ├── services/             # Capa de datos y persistencia (Firestore / BaaS)
-│   │   ├── orderService.ts         # Operaciones de órdenes y comprador verificado
+│   │   ├── orderService.ts         # Integridad de precios, stock y validación estricta de comprador
 │   │   └── productService.ts       # Operaciones de catálogo y cálculo de reviews
-│   ├── tests/                # Suite de 28 pruebas automatizadas
+│   ├── tests/                # Suite de 32 pruebas automatizadas (100% Passing)
 │   │   ├── cartReducer.test.ts     # Pruebas unitarias de la función reductora (8 tests)
-│   │   ├── integration.test.tsx    # Test integral de flujo de compra completo (3 tests)
+│   │   ├── integration.test.tsx    # Test integral de compra, recálculo de precios y comprador verificado (6 tests)
 │   │   ├── ProductCard.test.tsx    # Pruebas de renderizado de componentes (5 tests)
 │   │   ├── ProtectedRoute.test.tsx # Pruebas de guard de rutas y RBAC (3 tests)
-│   │   ├── s3Presign.test.ts       # Pruebas de seguridad de API Serverless (6 tests)
+│   │   ├── s3Presign.test.ts       # Pruebas de compuertas de seguridad S3 (7 tests)
 │   │   └── useDebounce.test.ts     # Pruebas del hook con temporizadores falsos (3 tests)
 │   ├── types/                # Contratos e interfaces TypeScript
 │   ├── App.tsx               # Enrutamiento principal con React Router DOM
 │   └── main.tsx              # Entrada de la aplicación React
-├── firestore.rules           # Reglas de seguridad basadas en roles y validación de órdenes
+├── firestore.rules           # Reglas de seguridad basadas en roles, Custom Claims y keys().hasOnly()
 ├── vercel.json               # Configuración de rewrites para SPA y Serverless
-├── .env.example              # Plantilla de variables de entorno
+├── .env.example              # Plantilla de variables de entorno (sanitizada)
 └── package.json
 ```
 
