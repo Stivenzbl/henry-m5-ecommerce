@@ -22,6 +22,26 @@ describe('S3 Presign Serverless Function Security Gate', () => {
     return res;
   };
 
+  const createMockJwt = (payload: Record<string, any>) => {
+    const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64');
+    const body = Buffer.from(JSON.stringify(payload)).toString('base64');
+    const sig = Buffer.from('mock-sig').toString('base64');
+    return `${header}.${body}.${sig}`;
+  };
+
+  const adminToken = createMockJwt({
+    admin: true,
+    email: 'admin@patagonix.com',
+    sub: 'admin-123',
+  });
+
+  const customerToken = createMockJwt({
+    admin: false,
+    role: 'customer',
+    email: 'cliente@patagonix.com',
+    sub: 'cust-123',
+  });
+
   it('rejects non-POST HTTP methods with 405 Method Not Allowed', async () => {
     const req = { method: 'GET' };
     const res = createMockRes();
@@ -47,9 +67,6 @@ describe('S3 Presign Serverless Function Security Gate', () => {
   });
 
   it('rejects authenticated non-admin customer requests with 403 Forbidden', async () => {
-    // Simulated token for standard customer
-    const customerToken = 'header.' + Buffer.from(JSON.stringify({ role: 'customer', email: 'cliente@patagonix.com' })).toString('base64') + '.sig';
-
     const req = {
       method: 'POST',
       headers: {
@@ -69,7 +86,7 @@ describe('S3 Presign Serverless Function Security Gate', () => {
     const req = {
       method: 'POST',
       headers: {
-        authorization: 'Bearer admin-secret-dev-token',
+        authorization: `Bearer ${adminToken}`,
       },
       body: { fileName: 'malicioso.exe', fileType: 'application/x-msdownload' },
     };
@@ -85,7 +102,7 @@ describe('S3 Presign Serverless Function Security Gate', () => {
     const req = {
       method: 'POST',
       headers: {
-        authorization: 'Bearer admin-secret-dev-token',
+        authorization: `Bearer ${adminToken}`,
       },
       body: { 
         fileName: 'pesado.png', 
@@ -105,7 +122,7 @@ describe('S3 Presign Serverless Function Security Gate', () => {
     const req = {
       method: 'POST',
       headers: {
-        authorization: 'Bearer admin-secret-dev-token',
+        authorization: `Bearer ${adminToken}`,
       },
       body: { fileName: '' },
     };
@@ -115,5 +132,27 @@ describe('S3 Presign Serverless Function Security Gate', () => {
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.data.error).toMatch(/Campos requeridos ausentes/i);
+  });
+
+  it('returns 503 fail-closed when AWS credentials are not configured', async () => {
+    // Ensure AWS env vars are undefined
+    const oldKey = process.env.AWS_ACCESS_KEY_ID;
+    delete process.env.AWS_ACCESS_KEY_ID;
+
+    const req = {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+      },
+      body: { fileName: 'test-product.png', fileType: 'image/png' },
+    };
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    if (oldKey) process.env.AWS_ACCESS_KEY_ID = oldKey;
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.data.code).toBe('STORAGE_UNCONFIGURED');
   });
 });
