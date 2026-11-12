@@ -51,21 +51,6 @@ export const LoginView: React.FC = () => {
     }
   };
 
-  const handleDemoLogin = async (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setErrorMessage(null);
-    setIsSubmitting(true);
-    try {
-      await login(demoEmail, demoPass);
-      navigate(returnTo.startsWith('/') ? returnTo : '/');
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Error al conectar con la cuenta demo.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleSendReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resetEmail) return;
@@ -261,30 +246,32 @@ export const LoginView: React.FC = () => {
             </button>
           </form>
 
-          {/* Academic Demo Accounts Section (Real Firebase Credentials) */}
+          {/* Academic Evaluation Accounts Section */}
           <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-800">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Cuentas de Evaluación (Henry M5)
+                Cuentas de Evaluación Académica
               </span>
               <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
-                1-Click
+                Auto-completar Email
               </span>
             </div>
             
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              Autentican contra Firebase Auth. El rol se valida automáticamente en el token de sesión.
+              Selecciona un perfil para rellenar el correo del evaluador. Ninguna contraseña administrativa reside en el código cliente.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <button
                 type="button"
-                disabled={isSubmitting}
-                onClick={() => handleDemoLogin('cliente@patagonix.com', 'Cliente123!')}
+                onClick={() => {
+                  setEmail('cliente@patagonix.com');
+                  setErrorMessage(null);
+                }}
                 className="p-3 text-left rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all group"
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-gray-900 dark:text-white">Cliente Demo</span>
+                  <span className="text-xs font-bold text-gray-900 dark:text-white">Perfil Cliente</span>
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
                     CUSTOMER
                   </span>
@@ -295,18 +282,20 @@ export const LoginView: React.FC = () => {
 
               <button
                 type="button"
-                disabled={isSubmitting}
-                onClick={() => handleDemoLogin('admin@patagonix.com', 'AdminRoot123!')}
+                onClick={() => {
+                  setEmail('admin@patagonix.com');
+                  setErrorMessage(null);
+                }}
                 className="p-3 text-left rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all group"
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-gray-900 dark:text-white">Admin Demo</span>
+                  <span className="text-xs font-bold text-gray-900 dark:text-white">Perfil Administrador</span>
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
                     ADMIN
                   </span>
                 </div>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">admin@patagonix.com</p>
-                <p className="text-[10px] text-gray-400 mt-1">Panel CRUD, S3 upload y Analytics</p>
+                <p className="text-[10px] text-gray-400 mt-1">Consola CRUD, S3 upload y Analytics</p>
               </button>
             </div>
           </div>

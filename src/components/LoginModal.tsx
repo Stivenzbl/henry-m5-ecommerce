@@ -52,18 +52,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
-  const handleDemo = async (demoEmail: string, demoPass: string) => {
+  const handlePrefillEmail = (demoEmail: string) => {
     setEmail(demoEmail);
-    setPassword(demoPass);
-    setIsSubmitting(true);
-    try {
-      await login(demoEmail, demoPass);
-      onClose();
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Error al autenticar cuenta demo.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    setPassword('');
+    setErrorMessage(null);
   };
 
   return (
@@ -151,21 +143,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
         <div className="mt-5 pt-4 border-t border-gray-200 dark:border-gray-700">
           <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-            Cuentas Demo Académicas
+            Autocompletar correos de prueba
           </p>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => handleDemo('cliente@patagonix.com', 'Cliente123!')}
-              className="p-2 text-left rounded-lg border border-gray-200 dark:border-gray-700 hover:border-indigo-500 text-xs"
+              onClick={() => handlePrefillEmail('cliente@patagonix.com')}
+              className="p-2 text-left rounded-lg border border-gray-200 dark:border-gray-700 hover:border-indigo-500 text-xs transition"
+              title="Autocompletar email cliente"
             >
               <div className="font-bold text-gray-800 dark:text-gray-200">Cliente</div>
               <div className="text-[10px] text-gray-400 truncate">cliente@patagonix.com</div>
             </button>
             <button
               type="button"
-              onClick={() => handleDemo('admin@patagonix.com', 'AdminRoot123!')}
-              className="p-2 text-left rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-500 text-xs"
+              onClick={() => handlePrefillEmail('admin@patagonix.com')}
+              className="p-2 text-left rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-500 text-xs transition"
+              title="Autocompletar email admin"
             >
               <div className="font-bold text-gray-800 dark:text-gray-200">Admin</div>
               <div className="text-[10px] text-gray-400 truncate">admin@patagonix.com</div>
