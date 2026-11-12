@@ -372,7 +372,7 @@ VITE_USE_FIREBASE_EMULATOR=false
 VITE_ENABLE_DEMO_ACCOUNTS=true
 
 # Servidor Serverless / Vercel (Privadas, jamás prefijar con VITE_)
-AWS_ACCESS_KEY_ID=AKIAXN32PRE57UMU2ZND
+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
 AWS_SECRET_ACCESS_KEY=tu-secret-access-key-privada
 AWS_REGION=us-east-2
 AWS_S3_BUCKET_NAME=patagonix-retail-stivenzbl

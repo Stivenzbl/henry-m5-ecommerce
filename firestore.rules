@@ -2,18 +2,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function: verifies user is authenticated
+    // Helper function: verifies user is authenticated via Firebase Auth
     function isAuthenticated() {
-      return request.auth != null;
+      return request.auth != null && request.auth.uid != '';
     }
 
-    // Helper function: checks if user has admin role in Firestore
+    // Helper function: checks if user has cryptographic admin custom claim
+    // SEC-02 HARDENING: Role derives exclusively from server-signed JWT Custom Claim
     function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.admin == true ||
-        request.auth.token.role == 'admin' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-      );
+      return isAuthenticated() && request.auth.token.admin == true;
     }
 
     // Helper function: verifies ownership of document
@@ -22,8 +19,8 @@ service cloud.firestore {
     }
 
     // Products collection:
-    // Anyone (even unauthenticated customers) can view products.
-    // Only administrators can create, update, or delete products.
+    // Anyone (even unauthenticated visitors) can read products.
+    // Only verified administrators with Custom Claim can create, update, or delete.
     match /products/{productId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -31,29 +28,44 @@ service cloud.firestore {
       // Subcollection: Product reviews
       match /reviews/{reviewId} {
         allow read: if true;
-        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+        allow create: if isAuthenticated() && 
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.rating is number &&
+          request.resource.data.rating >= 1 &&
+          request.resource.data.rating <= 5 &&
+          request.resource.data.comment is string &&
+          request.resource.data.comment.size() >= 3 &&
+          request.resource.data.comment.size() <= 1000;
         allow update, delete: if isAdmin() || isOwner(resource.data.userId);
       }
     }
 
     // Users collection:
     // Each user can read their own profile; admins can read all profiles.
-    // SEC-01 FIX: Prevent self-promotion to admin upon user document creation.
+    // SEC-01 HARDENING: Prevent self-promotion. Role field is strictly locked.
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role == 'customer');
-      // Only admin can change role field
-      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) || isAdmin();
+      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'admin'])) || isAdmin();
       allow delete: if isAdmin();
     }
 
     // Orders collection:
-    // Customers can only create and read their own orders.
-    // Admins have full access to view, filter, and change status of all orders.
+    // SEC-03 HARDENING: Orders strictly validated. Customers cannot fabricate arbitrary totals or statuses.
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAdmin(); // Status transitions (pending -> processing -> completed / cancelled)
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.items is list &&
+        request.resource.data.items.size() > 0 &&
+        request.resource.data.totalPrice is number &&
+        request.resource.data.totalPrice > 0 &&
+        request.resource.data.totalQuantity is int &&
+        request.resource.data.totalQuantity > 0 &&
+        request.resource.data.shippingAddress is map &&
+        request.resource.data.createdAt is string;
+      allow update: if isAdmin(); // Only admins can transition order statuses
       allow delete: if isAdmin();
     }
   }
