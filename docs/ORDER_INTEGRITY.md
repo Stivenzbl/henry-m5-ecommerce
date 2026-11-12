@@ -1,62 +1,81 @@
 # 💰 Integridad Comercial, Precios y Ciclo de Vida de Órdenes
 
 > **Rama de Trabajo:** `hardening/enterprise-security-core`  
-> **Servicio:** `src/services/orderService.ts`  
-> **Fecha:** 12 de Noviembre de 2026  
+> **Servicios:** `api/orders.ts`, `api/reviews.ts`, `api/lib/serverStore.ts`, `src/services/orderService.ts`, `firestore.rules`  
+> **Fecha:** 12 de Noviembre de 2026 (Segunda Vuelta de Hardening)  
 
 ---
 
 ## 1. 📋 Implementado
 
-1. **Recálculo Autoritativo de Precios y Subtotales:**
-   - `OrderService.createOrder` desconfía de cualquier precio unitario, subtotal o `totalPrice` enviado desde el frontend.
-   - Para cada producto del pedido, consulta `ProductService.getById(item.product.id)` para recuperar el registro oficial del catálogo.
-   - Sustituye los datos del ítem con el precio oficial de la base de datos.
-   - Calcula subtotales: `subtotal = authoritativePrice * quantity`.
-   - Suma el total general con redondeo matemático a dos decimales (`Math.round(sum * 100) / 100`).
+1. **Endpoint Backend Autoritativo (`POST /api/orders`):**
+   - **Cero Confianza en el Cliente:** El backend ignora completamente `userId`, `userEmail`, `unitPrice` y `totalPrice` enviados por el cliente.
+   - **Identidad Criptográfica:** El `userId` (`sub`) y `email` se extraen exclusivamente del JWT verificado con RS256.
+   - **Catálogo Autoritativo:** Cada producto se consulta en el catálogo autoritativo del servidor. Precios manipulados son sobreescritos automáticamente con el precio oficial de la base de datos.
+   - **Validación de Cantidad:** Exige números enteros estrictamente positivos (`quantity > 0` y `Number.isInteger(quantity)`).
+   - **Reglas Firestore Blindadas (`firestore.rules`):**
+     ```javascript
+     match /orders/{orderId} {
+       // PROHIBIDO CREAR ÓRDENES DIRECTAMENTE DESDE EL CLIENT SDK
+       // Toda orden debe originarse en POST /api/orders
+       allow create: if false;
+       allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isAdmin());
+       allow update: if isAdmin() && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+         request.resource.data.status in ['pending', 'processing', 'completed', 'cancelled'];
+       allow delete: if false;
+     }
+     ```
 
-2. **Control Estricto de Inventario (Stock Validation):**
-   - Comprueba que la cantidad solicitada sea un entero positivo mayor a cero.
-   - Valida que `product.stock >= item.quantity`.
-   - Si no hay suficiente inventario disponible, rechaza la transacción con un error explícito: *"Stock insuficiente para [producto]"*.
+2. **Motor Transaccional y Reserva Atómica de Stock con Rollback:**
+   - La función `reserveProductStock(productId, quantity)` descuenta inventario atómicamente si hay stock suficiente.
+   - Si cualquier ítem subsecuente falla (por ejemplo, producto sin stock o inexistente), se activa inmediatamente `rollbackProductStock(reservedItems)` restaurando el inventario original de todos los ítems previamente reservados.
+   - La orden se inicializa forzosamente con `status: 'pending'`.
 
-3. **Inmutabilidad y Estados Permitidos:**
-   - Cada orden nueva se inicializa forzosamente con `status: 'pending'`.
-   - El cliente no puede registrar órdenes en estados privilegiados como `completed` o `shipped`.
-   - La transición de estados queda reservada a administradores mediante `OrderService.updateOrderStatus`.
-
-4. **Ciclo de Vida del Comprador Verificado:**
-   - `OrderService.hasUserPurchasedProduct(userId, productId)` exige de manera estricta que la orden posea `status === 'completed'`.
-   - Órdenes en estado `pending`, `processing` o `cancelled` retornan `false`.
-
-5. **Política Fail-Closed:**
-   - Si Firebase está configurado en producción y Firestore rechaza la escritura de la orden, el sistema lanza una excepción y no crea órdenes fantasmas locales.
-   - El fallback a `localStorage` queda relegado exclusivamente al desarrollo local offline cuando no se han inyectado variables de Firebase.
+3. **Endpoint Autoritativo de Reseñas y Comprador Verificado (`POST /api/reviews`):**
+   - **Cero Manipulación de Verificación:** El backend ignora cualquier flag `isVerifiedBuyer: true` enviado por el cliente.
+   - **Auditoría de Compras Completadas:** Consulta en el almacenamiento del servidor si el `userId` autenticado posee órdenes con `status === 'completed'` que contengan el producto evaluado.
+   - Si la orden está en `pending`, `processing` o `cancelled`, `isVerifiedBuyer` se fija en `false`. Solo si la orden está completada se otorga `isVerifiedBuyer: true`.
+   - **Reglas de Productos Blindadas (`firestore.rules`):**
+     ```javascript
+     match /products/{productId} {
+       allow read: if true;
+       // Las mutaciones de productos, stock y reseñas están restringidas a Admin o Backend API
+       allow write: if isAdmin();
+     }
+     ```
 
 ---
 
 ## 2. 🧪 Probado
 
-1. **Pruebas de Integración (`src/tests/integration.test.tsx`):**
-   - **Neutralización de Manipulación de Precios:** Se probó el envío de una orden con un precio manipulado de $0.01 y total de $0.02. El sistema sobreescribió los importes calculando el precio real del catálogo ($189.99 * 2 = $379.98).
-   - **Rechazo por Producto Inexistente:** Se verificó que solicitar un producto inexistente lanza una excepción `Producto no existe en el catálogo`.
-   - **Rechazo por Stock Insuficiente:** Se verificó que solicitar 9999 unidades de un artículo con stock 15 lanza una excepción `Stock insuficiente`.
-   - **Ciclo de Vida de Comprador Verificado:**
-     - Usuario sin compras ➔ `false`.
-     - Orden en estado `pending` ➔ `false`.
-     - Orden actualizada a `processing` ➔ `false`.
-     - Orden actualizada a `completed` ➔ `true`.
-     - Orden actualizada a `cancelled` ➔ `false`.
+1. **Suite de Integridad de Órdenes (`src/tests/orderApi.test.ts` - 7 tests):**
+   - `rejects unauthenticated requests (HTTP 401)`: Solicitudes sin Bearer token son rechazadas.
+   - `rejects empty order items (HTTP 400)`: Carritos vacíos son bloqueados.
+   - `rejects invalid quantities (zero, negative, float) (HTTP 400)`: Cantidades `<= 0` o decimales son bloqueadas.
+   - `rejects non-existent product in catalog (HTTP 400)`: Ítems no catalogados devuelven 400.
+   - `rejects order when requested quantity exceeds available stock (HTTP 400)`: Sobredemanda rechazada.
+   - `calculates authoritative total price and ignores client-forged prices`: Ataque de precio manipulado ($0.01) sobreescrito con precio de catálogo ($189.99 * 2 = $379.98) y status `pending`.
+   - `rolls back previously reserved items if a subsequent item fails in checkout transaction`: Transacción fallida revierte automáticamente el stock de ítems previos.
+
+2. **Suite de Reseñas y Comprador Verificado (`src/tests/reviewsApi.test.ts` - 5 tests):**
+   - `rejects unauthenticated review submissions (HTTP 401)`.
+   - `rejects invalid ratings out of range 1-5 (HTTP 400)`.
+   - `denies verified buyer status even if client sends isVerifiedBuyer: true`: Intento de spoofing bloqueado (retorna `isVerifiedBuyer: false`).
+   - `marks isVerifiedBuyer as false when user has orders in pending/processing status`.
+   - `grants isVerifiedBuyer: true strictly when user has a completed order for the product`.
+
+3. **Pruebas de Reducer y Frontend (`src/tests/cartReducer.test.ts`, `src/tests/integration.test.tsx`):**
+   - Comprobación de estado local, persistencia y ciclo de vida.
 
 ---
 
 ## 3. ⏳ Pendiente (Mejoras Futuras)
 
-1. **Descuento Atómico de Stock con Transacciones Firestore:** Implementar `runTransaction()` en Firestore para decrementar el stock del catálogo en la misma operación atómica de creación de la orden.
-2. **Integración con Pasarela de Pagos Real (Stripe / Mercado Pago):** Configurar webhooks serverless (`api/stripe-webhook.ts`) para transicionar el estado de la orden de `pending` a `completed` únicamente tras la confirmación de cobro del procesador bancario.
+1. **Webhook de Pasarela de Pagos Externa (Stripe / Mercado Pago):** Configurar webhooks serverless (`api/webhooks/stripe.ts`) con firma criptográfica HMAC SHA-256 para pasar automáticamente órdenes de `pending` a `completed` tras la captura de fondos.
 
 ---
 
 ## 4. 🔍 No Verificable (Dependencias de Entorno Externo)
 
-1. **Confirmación Bancaria Real:** En el entorno actual, la transición a `completed` es simulada por el panel administrativo o el flujo de pruebas, ya que no hay una cuenta de Stripe o Mercado Pago en vivo conectada con fondos reales.
+1. **Captura Bancaria en Vivo:** La transición de `pending` a `completed` en este entorno académico/demo se efectúa mediante el panel de administración o llamadas autorizadas, al no contar con un adquirente financiero de producción con fondos reales.

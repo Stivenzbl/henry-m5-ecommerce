@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { CatalogView } from './pages/CatalogView';
-import { OrdersView } from './pages/OrdersView';
-import { AdminView } from './pages/AdminView';
-import { LoginView } from './pages/LoginView';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './pages/CheckoutModal';
 import { ProtectedRoute } from './components/ProtectedRoute';
+
+const OrdersView = lazy(() => import('./pages/OrdersView').then(m => ({ default: m.OrdersView })));
+const AdminView = lazy(() => import('./pages/AdminView').then(m => ({ default: m.AdminView })));
+const LoginView = lazy(() => import('./pages/LoginView').then(m => ({ default: m.LoginView })));
+
+const RouteLoadingFallback: React.FC = () => (
+  <div className="flex items-center justify-center min-h-[50vh]" role="status" aria-label="Cargando vista">
+    <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 const AppLayout: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -22,28 +29,30 @@ const AppLayout: React.FC = () => {
       )}
 
       <main className={isLoginPage ? 'flex-1' : 'flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8'}>
-        <Routes>
-          <Route path="/" element={<CatalogView />} />
-          <Route path="/catalog" element={<Navigate to="/" replace />} />
-          <Route path="/login" element={<LoginView />} />
-          <Route 
-            path="/orders" 
-            element={
-              <ProtectedRoute>
-                <OrdersView />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/admin" 
-            element={
-              <ProtectedRoute requireAdmin>
-                <AdminView />
-              </ProtectedRoute>
-            } 
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <Routes>
+            <Route path="/" element={<CatalogView />} />
+            <Route path="/catalog" element={<Navigate to="/" replace />} />
+            <Route path="/login" element={<LoginView />} />
+            <Route 
+              path="/orders" 
+              element={
+                <ProtectedRoute>
+                  <OrdersView />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminView />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </main>
 
       <CartDrawer

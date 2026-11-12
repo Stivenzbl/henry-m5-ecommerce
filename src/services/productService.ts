@@ -1,5 +1,5 @@
 import { Product, ProductCategory, Review } from '../types/product';
-import { db, isFirebaseConfigured } from '../lib/firebase';
+import { db, isFirebaseConfigured, auth } from '../lib/firebase';
 import { OrderService } from './orderService';
 import {
   collection,
@@ -311,7 +311,41 @@ export class ProductService {
     productId: string,
     reviewData: { userId: string; userName: string; rating: number; comment: string }
   ): Promise<Product> {
-    // Audit Requirement: Authenticate and check if the user is a verified purchaser
+    // 1. Authoritative Backend Endpoint: POST /api/reviews
+    try {
+      if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+        const token = await auth?.currentUser?.getIdToken().catch(() => null);
+        if (token) {
+          const res = await fetch('/api/reviews', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              productId,
+              rating: reviewData.rating,
+              comment: reviewData.comment,
+              userName: reviewData.userName,
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            return data.product;
+          } else {
+            const errBody = await res.json().catch(() => ({}));
+            throw new Error(errBody.error || 'Fallo al publicar la reseña en el servidor.');
+          }
+        }
+      }
+    } catch (netErr: any) {
+      if (netErr.message && !netErr.message.includes('Failed to fetch') && !netErr.message.includes('fetch is not defined')) {
+        throw netErr;
+      }
+    }
+
+    // 2. Local fallback calculation (offline development & testing)
     const isVerifiedBuyer = await OrderService.hasUserPurchasedProduct(
       reviewData.userId,
       productId

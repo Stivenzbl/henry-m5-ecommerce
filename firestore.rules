@@ -19,30 +19,18 @@ service cloud.firestore {
     }
 
     // Products collection:
-    // Anyone (even unauthenticated visitors) can read products.
-    // Only verified administrators with Custom Claim can create, update catalog fields, or delete.
-    // Authenticated users can only submit reviews and update aggregate ratings.
+    // Anyone can read products.
+    // SEC-03 HARDENING: Only verified administrators and backend services can write.
+    // Clients CANNOT directly mutate products, prices, stock, reviews or ratings.
     match /products/{productId} {
       allow read: if true;
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin() || (
-        isAuthenticated() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviews', 'rating', 'ratingCount'])
-      );
+      allow write: if isAdmin();
 
-      // Subcollection: Product reviews
+      // Subcollection for dedicated reviews
       match /reviews/{reviewId} {
         allow read: if true;
-        allow create: if isAuthenticated() && 
-          request.resource.data.userId == request.auth.uid &&
-          request.resource.data.rating is number &&
-          request.resource.data.rating >= 1 &&
-          request.resource.data.rating <= 5 &&
-          request.resource.data.comment is string &&
-          request.resource.data.comment.size() >= 3 &&
-          request.resource.data.comment.size() <= 1000 &&
-          request.resource.data.keys().hasOnly(['id', 'productId', 'userId', 'userName', 'rating', 'comment', 'createdAt', 'isVerifiedBuyer']);
-        allow update, delete: if isAdmin() || isOwner(resource.data.userId);
+        // Reviews must be created through backend API /api/reviews which verifies completed purchases
+        allow create, update, delete: if isAdmin();
       }
     }
 
@@ -59,22 +47,16 @@ service cloud.firestore {
     }
 
     // Orders collection:
-    // SEC-03 HARDENING: Orders strictly validated. Customers cannot fabricate arbitrary totals or statuses.
+    // P0.1 HARDENING: Orders CANNOT be created directly via client-side SDK!
+    // Orders must be issued through the authoritative server endpoint /api/orders.
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && 
-        request.resource.data.userId == request.auth.uid &&
-        request.resource.data.status == 'pending' &&
-        request.resource.data.items is list &&
-        request.resource.data.items.size() > 0 &&
-        request.resource.data.totalPrice is number &&
-        request.resource.data.totalPrice > 0 &&
-        request.resource.data.totalQuantity is int &&
-        request.resource.data.totalQuantity > 0 &&
-        request.resource.data.shippingAddress is map &&
-        request.resource.data.createdAt is string &&
-        request.resource.data.keys().hasOnly(['userId', 'userEmail', 'items', 'totalPrice', 'totalQuantity', 'status', 'shippingAddress', 'createdAt']);
-      allow update: if isAdmin(); // Only admins can transition order statuses
+      allow create: if false; // Prohibit direct client-side creation!
+      
+      // P1.6 HARDENING: Status transitions strictly limited to admin and only status/updatedAt fields
+      allow update: if isAdmin() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+        request.resource.data.status in ['pending', 'processing', 'completed', 'cancelled'];
       allow delete: if isAdmin();
     }
   }

@@ -1,10 +1,10 @@
 # ☁️ Seguridad de Almacenamiento Cloud con AWS S3
 
 > **Rama de Trabajo:** `hardening/enterprise-security-core`  
-> **Servicio:** `api/s3-presign.ts`  
+> **Servicio:** `api/s3-presign.ts`, `src/components/AdminProductModal.tsx`  
 > **SDK:** `@aws-sdk/s3-presigned-post`  
 > **Región:** `us-east-2`  
-> **Fecha:** 12 de Noviembre de 2026  
+> **Fecha:** 12 de Noviembre de 2026 (Segunda Vuelta de Hardening)  
 
 ---
 
@@ -26,9 +26,13 @@
    - Inyección de prefijo y timestamp único: `products/${Date.now()}-${cleanName}`.
    - Imposibilidad de sobreescribir archivos existentes o ejecutar Path Traversal (`../`).
 
-4. **Principio Fail-Closed:**
+4. **Principio Fail-Closed en Backend:**
    - Si las variables de entorno de AWS no están presentes en el servidor (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET_NAME`), responde con código HTTP `503 Service Unavailable` (`STORAGE_UNCONFIGURED`).
    - Cero emisión de URLs simuladas o mocks en producción.
+
+5. **Principio Fail-Closed Estricto en Frontend (`src/components/AdminProductModal.tsx`):**
+   - Si la llamada al presigned endpoint o la posterior subida mediante `FormData` a S3 falla, el componente cancela la operación y presenta un mensaje de alerta visual en rojo (`uploadError`).
+   - Se eliminaron todos los fallbacks engañosos a `URL.createObjectURL(file)` y simulaciones de URLs tipo `mockS3Url`. La aplicación jamás disfraza un fallo de red o autorización como una carga exitosa.
 
 ---
 
@@ -37,7 +41,7 @@
 1. **Suite de Seguridad del Endpoint (`src/tests/s3Presign.test.ts` - 7 tests):**
    - **405 Method Not Allowed:** Rechazo de llamadas GET o PUT directas a la API.
    - **401 Unauthorized:** Rechazo de peticiones sin cabecera `Authorization`.
-   - **403 Forbidden:** Rechazo de clientes comunes autenticados sin rol admin.
+   - **403 Forbidden:** Rechazo de clientes comunes autenticados sin rol admin (verificado con RS256).
    - **415 Unsupported Media Type:** Rechazo de archivos ejecutables (`application/x-msdownload`).
    - **413 Payload Too Large:** Rechazo defensivo previo si el cliente declara un tamaño superior a 5 MB.
    - **400 Bad Request:** Rechazo de peticiones con nombres o tipos vacíos.

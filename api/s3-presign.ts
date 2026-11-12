@@ -1,6 +1,6 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
-import { verifyAuthToken } from './lib/verifyAuth';
+import { verifyAuthToken, VerifyAuthOptions } from './lib/verifyAuth';
 
 export interface PresignRequest {
   fileName: string;
@@ -19,7 +19,7 @@ export interface PresignResponse {
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB strictly enforced by S3 policy
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: any, res: any, testAuthOptions?: VerifyAuthOptions) {
   // 1. CORS Preflight
   if (req.method === 'OPTIONS') {
     if (res && typeof res.status === 'function') {
@@ -44,7 +44,7 @@ export default async function handler(req: any, res: any) {
   const authHeader = req.headers?.authorization || req.headers?.Authorization;
   let authResult;
   try {
-    authResult = await verifyAuthToken(authHeader);
+    authResult = await verifyAuthToken(authHeader, testAuthOptions);
   } catch (err: any) {
     const isForbidden = err.message === 'TOKEN_UNAUTHORIZED';
     const statusCode = isForbidden ? 403 : 401;

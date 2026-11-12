@@ -2,7 +2,8 @@
 
 > **Rama de Trabajo:** `hardening/enterprise-security-core`  
 > **Proveedor de Identidad:** Firebase Authentication + Google Cloud Identity  
-> **Fecha:** 12 de Noviembre de 2026  
+> **Motor Criptográfico:** JOSE (Javascript Object Signing and Encryption) con JWKS RS256  
+> **Fecha:** 12 de Noviembre de 2026 (Segunda Vuelta de Hardening)  
 
 ---
 
@@ -12,17 +13,24 @@
    - La aplicación inicia con `status = 'unauthenticated'` y `user = null`.
    - Se eliminó la creación predeterminada de `user-default-101` o cualquier sesión inventada en `localStorage`.
 
-2. **Autoridad Criptográfica de Roles (Custom Claims):**
+2. **Verificación Criptográfica RS256 Zero-Bypass (`api/lib/verifyAuth.ts`):**
+   - **Cero Bypass en Código:** Se erradicó cualquier condicional que eluda la verificación de firma digital (incluso en testing).
+   - En todos los entornos (desarrollo, pruebas, producción), cada token pasa por `jwtVerify(token, keyOrJwks, { issuer, audience, algorithms: ['RS256'] })`.
+   - Comprueba matemáticamente la firma digital contra el JWKS oficial de Google (`https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com`).
+   - Valida estrictamente emisor (`https://securetoken.google.com/<PROJECT_ID>`), audiencia (`<PROJECT_ID>`) y expiración temporal (`exp`).
+   - Extrae el identificador del usuario únicamente desde el claim canónico `sub` y los roles desde los claims criptográficos `admin === true` o `role === 'admin'`.
+
+3. **Autoridad Criptográfica de Roles (Custom Claims):**
    - El rol `admin` no se almacena en el documento del usuario en la base de datos ni se envía desde el cliente.
    - Se obtiene directamente del token firmado: `tokenResult.claims.admin === true`.
    - La función `mapFirebaseUser` en `src/contexts/AuthContext.tsx` mapea la identidad verificada.
 
-3. **Formularios de Acceso Limpios:**
+4. **Formularios de Acceso Limpios:**
    - Tanto [`LoginView.tsx`](file:///C:/Users/stive/henry_proyecto_m5_ecommerce/src/pages/LoginView.tsx) como [`LoginModal.tsx`](file:///C:/Users/stive/henry_proyecto_m5_ecommerce/src/components/LoginModal.tsx) solicitan únicamente correo electrónico y contraseña.
    - Se erradicaron dropdowns o selectores de roles que permitían autoelevar privilegios.
    - Los botones demo académicos únicamente autocompletan el email sin exponer contraseñas en el bundle público.
 
-4. **Componente `<ProtectedRoute>`:**
+5. **Componente `<ProtectedRoute>`:**
    - Intercepta el enrutamiento antes del montaje del componente protegido.
    - Protege rutas de cliente (`/orders`) y administrativas (`/admin`).
    - Sanitiza el parámetro `returnTo` asegurando que sea una ruta relativa interna que inicie con `/`.
@@ -31,11 +39,24 @@
 
 ## 2. 🧪 Probado
 
-1. **Pruebas de Guardias de Ruta (`src/tests/ProtectedRoute.test.tsx`):**
+1. **Suite Criptográfica de Verificación JWT (`src/tests/jwtVerify.test.ts` - 10 tests):**
+   - `verifies valid RS256 token and extracts sub, email, and admin claims`: Token firmado con clave RSA 2048 bits válido.
+   - `rejects token with tampered payload / broken signature`: Detección instantánea de payload adulterado (`ERR_JWS_SIGNATURE_VERIFICATION_FAILED`).
+   - `rejects token signed with an untrusted keypair`: Rechazo de firma con clave RSA no autorizada.
+   - `rejects expired tokens (ERR_JWT_EXPIRED)`: Rechazo de tokens con expiración en el pasado.
+   - `rejects token with mismatched issuer`: Rechazo si el emisor no coincide con `securetoken.google.com`.
+   - `rejects token with mismatched audience`: Rechazo si la audiencia no coincide con el Project ID.
+   - `rejects token without sub subject claim`: Rechazo si falta el identificador canónico del sujeto.
+   - `identifies non-admin user when admin claim is omitted`: Asignación segura de `isAdmin: false`.
+   - `rejects malformed token strings`: Rechazo de strings no formateadas como JWT.
+   - `rejects missing or non-Bearer authorization header`: Rechazo con `AUTH_REQUIRED`.
+
+2. **Pruebas de Guardias de Ruta (`src/tests/ProtectedRoute.test.tsx` - 3 tests):**
    - Redirige a visitante anónimo a `/login?returnTo=%2Fadmin`.
    - Bloquea cliente con `isAdmin: false` en `/admin` mostrando `ForbiddenView` (código visual 403).
    - Concede acceso sin obstáculos a usuarios con claim `admin === true`.
-2. **Pruebas de Integración (`src/tests/integration.test.tsx`):**
+
+3. **Pruebas de Integración (`src/tests/integration.test.tsx` - 6 tests):**
    - Valida el estado inicial desacoplado con sesión nula y carrito vacío.
 
 ---

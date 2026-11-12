@@ -107,30 +107,21 @@ export const AdminProductModal: React.FC<AdminProductModalProps> = ({
             setUploadMessage('¡Archivo subido exitosamente a AWS S3 con política de tamaño verificada!');
             return;
           } else {
+            setUploadSuccess(false);
             setUploadMessage('AWS S3 rechazó la carga: verifique el tamaño (máximo 5 MB) y formato.');
             return;
           }
         }
       } else {
         const errorData = await presignRes.json().catch(() => ({}));
-        setUploadMessage(errorData.error || 'Error de autorización en endpoint S3.');
+        setUploadSuccess(false);
+        setUploadMessage(errorData.error || 'Error de autorización o almacenamiento no configurado en servidor.');
         return;
       }
-
-      // Safe demo simulation fallback when AWS credentials are not active
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-      const mockS3Url = `https://patagonix-retail-assets.s3.us-east-1.amazonaws.com/products/${Date.now()}-${sanitizedName}`;
-      setImageUrl(mockS3Url);
-      setUploadSuccess(true);
-      setUploadMessage('¡Imagen cargada en modo demostración!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error during S3 upload workflow:', err);
-      // Fallback preview
-      const localPreview = URL.createObjectURL(file);
-      setImageUrl(localPreview);
-      setUploadSuccess(true);
-      setUploadMessage('¡Imagen cargada localmente!');
+      setUploadSuccess(false);
+      setUploadMessage(err?.message || 'Error de red durante la comunicación con el servicio de almacenamiento.');
     } finally {
       setIsUploading(false);
     }

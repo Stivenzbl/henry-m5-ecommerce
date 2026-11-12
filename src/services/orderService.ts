@@ -1,6 +1,6 @@
 import { Order, OrderStatus } from '../types/order';
 import { CartItem } from '../types/cart';
-import { db, isFirebaseConfigured } from '../lib/firebase';
+import { db, isFirebaseConfigured, auth } from '../lib/firebase';
 import { ProductService } from './productService';
 import { 
   collection, 
@@ -62,7 +62,42 @@ export class OrderService {
       throw new Error('Dirección de envío completa es requerida.');
     }
 
-    // Authoritative calculation & stock verification from catalogue
+    // 1. Authoritative Backend Endpoint: POST /api/orders
+    try {
+      if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+        const token = await auth?.currentUser?.getIdToken().catch(() => null);
+        if (token) {
+          const res = await fetch('/api/orders', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              items: params.items.map(item => ({
+                productId: item.product.id,
+                quantity: item.quantity,
+              })),
+              shippingAddress: params.shippingAddress,
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            return data.order;
+          } else {
+            const errBody = await res.json().catch(() => ({}));
+            throw new Error(errBody.error || 'Fallo al procesar la orden en el servidor.');
+          }
+        }
+      }
+    } catch (netErr: any) {
+      if (netErr.message && !netErr.message.includes('Failed to fetch') && !netErr.message.includes('fetch is not defined')) {
+        throw netErr;
+      }
+    }
+
+    // 2. Authoritative local calculation (offline development & unit testing)
     const verifiedItems: CartItem[] = [];
     let calculatedTotalPrice = 0;
     let calculatedTotalQuantity = 0;

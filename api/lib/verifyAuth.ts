@@ -17,12 +17,21 @@ export interface VerifiedAuthResult {
   claims: JWTPayload;
 }
 
+export interface VerifyAuthOptions {
+  projectId?: string;
+  keyOrJwks?: Parameters<typeof jwtVerify>[1];
+  issuer?: string;
+}
+
 /**
- * Verifies a Firebase ID token cryptographically using Google's public JWKS.
- * Checks signature, expiration, audience (projectId), and issuer.
- * In test environment, accepts signed test tokens with valid claims.
+ * Cryptographically verifies a Firebase ID token using RS256 digital signature.
+ * Enforces cryptographic signature verification, expiration, issuer, and audience.
+ * NO test bypass: in all environments, tokens must be cryptographically signed.
  */
-export async function verifyAuthToken(authHeader: string | undefined, projectId?: string): Promise<VerifiedAuthResult> {
+export async function verifyAuthToken(
+  authHeader: string | undefined,
+  options?: VerifyAuthOptions
+): Promise<VerifiedAuthResult> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     throw new Error('AUTH_REQUIRED');
   }
@@ -32,42 +41,21 @@ export async function verifyAuthToken(authHeader: string | undefined, projectId?
     throw new Error('TOKEN_EMPTY');
   }
 
-  // Test environment bypass hook (only when VITEST or NODE_ENV === 'test')
-  if (process.env.VITEST || process.env.NODE_ENV === 'test') {
-    try {
-      const parts = token.split('.');
-      if (parts.length === 3) {
-        const payloadJson = Buffer.from(parts[1], 'base64').toString('utf8');
-        const payload = JSON.parse(payloadJson);
-        if (payload.iss && payload.iss.includes('test-unauthorized')) {
-          throw new Error('TOKEN_UNAUTHORIZED');
-        }
-        return {
-          uid: payload.sub || payload.uid || 'test-user',
-          email: payload.email,
-          isAdmin: payload.admin === true,
-          claims: payload,
-        };
-      }
-    } catch (e: any) {
-      if (e.message === 'TOKEN_UNAUTHORIZED') throw e;
-      throw new Error('INVALID_TOKEN');
-    }
-  }
+  const pid = options?.projectId || process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || 'patagonix-retail';
+  const keyOrJwks = options?.keyOrJwks || getJwks();
+  const issuer = options?.issuer || `https://securetoken.google.com/${pid}`;
 
-  const pid = projectId || process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
-  if (!pid) {
-    throw new Error('PROJECT_ID_NOT_CONFIGURED');
-  }
-
-  const jwks = getJwks();
-  const { payload } = await jwtVerify(token, jwks, {
-    issuer: `https://securetoken.google.com/${pid}`,
+  const { payload } = await jwtVerify(token, keyOrJwks as any, {
+    issuer,
     audience: pid,
   });
 
+  if (!payload.sub) {
+    throw new Error('INVALID_TOKEN_NO_SUB');
+  }
+
   return {
-    uid: payload.sub || '',
+    uid: payload.sub,
     email: typeof payload.email === 'string' ? payload.email : undefined,
     isAdmin: payload.admin === true,
     claims: payload,

@@ -1,7 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
+import { generateKeyPair, SignJWT } from 'jose';
 import handler from '../../api/s3-presign';
+import { VerifyAuthOptions } from '../../api/lib/verifyAuth';
 
 describe('S3 Presign Serverless Function Security Gate', () => {
+  let publicKey: any;
+  let privateKey: any;
+  let authOptions: VerifyAuthOptions;
+
+  beforeAll(async () => {
+    const keyPair = await generateKeyPair('RS256');
+    publicKey = keyPair.publicKey;
+    privateKey = keyPair.privateKey;
+    authOptions = {
+      keyOrJwks: publicKey,
+      projectId: 'patagonix-retail',
+    };
+  });
+
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -22,31 +38,21 @@ describe('S3 Presign Serverless Function Security Gate', () => {
     return res;
   };
 
-  const createMockJwt = (payload: Record<string, any>) => {
-    const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64');
-    const body = Buffer.from(JSON.stringify(payload)).toString('base64');
-    const sig = Buffer.from('mock-sig').toString('base64');
-    return `${header}.${body}.${sig}`;
+  const createSignedToken = async (claims: Record<string, any>) => {
+    return await new SignJWT(claims)
+      .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
+      .setIssuer('https://securetoken.google.com/patagonix-retail')
+      .setAudience('patagonix-retail')
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(privateKey);
   };
-
-  const adminToken = createMockJwt({
-    admin: true,
-    email: 'admin@patagonix.com',
-    sub: 'admin-123',
-  });
-
-  const customerToken = createMockJwt({
-    admin: false,
-    role: 'customer',
-    email: 'cliente@patagonix.com',
-    sub: 'cust-123',
-  });
 
   it('rejects non-POST HTTP methods with 405 Method Not Allowed', async () => {
     const req = { method: 'GET' };
     const res = createMockRes();
 
-    await handler(req, res);
+    await handler(req, res, authOptions);
 
     expect(res.status).toHaveBeenCalledWith(405);
     expect(res.data.error).toMatch(/Método no permitido/i);
@@ -60,13 +66,20 @@ describe('S3 Presign Serverless Function Security Gate', () => {
     };
     const res = createMockRes();
 
-    await handler(req, res);
+    await handler(req, res, authOptions);
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.data.code).toBe('AUTH_REQUIRED');
   });
 
   it('rejects authenticated non-admin customer requests with 403 Forbidden', async () => {
+    const customerToken = await createSignedToken({
+      sub: 'cust-123',
+      admin: false,
+      role: 'customer',
+      email: 'cliente@patagonix.com',
+    });
+
     const req = {
       method: 'POST',
       headers: {
@@ -76,13 +89,19 @@ describe('S3 Presign Serverless Function Security Gate', () => {
     };
     const res = createMockRes();
 
-    await handler(req, res);
+    await handler(req, res, authOptions);
 
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.data.code).toBe('FORBIDDEN_NOT_ADMIN');
   });
 
   it('rejects disallowed file MIME types (e.g. application/pdf) with 415', async () => {
+    const adminToken = await createSignedToken({
+      sub: 'admin-123',
+      admin: true,
+      email: 'admin@patagonix.com',
+    });
+
     const req = {
       method: 'POST',
       headers: {
@@ -92,13 +111,19 @@ describe('S3 Presign Serverless Function Security Gate', () => {
     };
     const res = createMockRes();
 
-    await handler(req, res);
+    await handler(req, res, authOptions);
 
     expect(res.status).toHaveBeenCalledWith(415);
     expect(res.data.error).toMatch(/Formato de archivo no permitido/i);
   });
 
   it('rejects files exceeding 5MB max size limit with 413', async () => {
+    const adminToken = await createSignedToken({
+      sub: 'admin-123',
+      admin: true,
+      email: 'admin@patagonix.com',
+    });
+
     const req = {
       method: 'POST',
       headers: {
@@ -107,18 +132,24 @@ describe('S3 Presign Serverless Function Security Gate', () => {
       body: { 
         fileName: 'pesado.png', 
         fileType: 'image/png',
-        fileSize: 10 * 1024 * 1024 // 10MB
+        fileSize: 10 * 1024 * 1024, // 10MB
       },
     };
     const res = createMockRes();
 
-    await handler(req, res);
+    await handler(req, res, authOptions);
 
     expect(res.status).toHaveBeenCalledWith(413);
     expect(res.data.error).toMatch(/supera el tamaño máximo/i);
   });
 
   it('rejects requests missing fileName or fileType with 400', async () => {
+    const adminToken = await createSignedToken({
+      sub: 'admin-123',
+      admin: true,
+      email: 'admin@patagonix.com',
+    });
+
     const req = {
       method: 'POST',
       headers: {
@@ -128,14 +159,19 @@ describe('S3 Presign Serverless Function Security Gate', () => {
     };
     const res = createMockRes();
 
-    await handler(req, res);
+    await handler(req, res, authOptions);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.data.error).toMatch(/Campos requeridos ausentes/i);
   });
 
   it('returns 503 fail-closed when AWS credentials are not configured', async () => {
-    // Ensure AWS env vars are undefined
+    const adminToken = await createSignedToken({
+      sub: 'admin-123',
+      admin: true,
+      email: 'admin@patagonix.com',
+    });
+
     const oldKey = process.env.AWS_ACCESS_KEY_ID;
     delete process.env.AWS_ACCESS_KEY_ID;
 
@@ -148,7 +184,7 @@ describe('S3 Presign Serverless Function Security Gate', () => {
     };
     const res = createMockRes();
 
-    await handler(req, res);
+    await handler(req, res, authOptions);
 
     if (oldKey) process.env.AWS_ACCESS_KEY_ID = oldKey;
 
