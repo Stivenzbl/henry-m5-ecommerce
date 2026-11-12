@@ -12,8 +12,10 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1166.0",
+    "@aws-sdk/s3-presigned-post": "^3.1167.0",
     "@aws-sdk/s3-request-presigner": "^3.1166.0",
     "firebase": "^13.3.0",
+    "jose": "^6.2.17",
     "lucide-react": "^1.16.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

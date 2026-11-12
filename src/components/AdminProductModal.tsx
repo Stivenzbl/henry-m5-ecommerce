@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { X, Upload, CheckCircle2 } from 'lucide-react';
 import { Product, ProductCategory } from '../types/product';
 import { ProductService } from '../services/productService';
-import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../lib/firebase';
 
 interface AdminProductModalProps {
@@ -18,7 +17,6 @@ export const AdminProductModal: React.FC<AdminProductModalProps> = ({
   onSuccess,
   productToEdit,
 }) => {
-  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('49.99');
@@ -65,8 +63,13 @@ export const AdminProductModal: React.FC<AdminProductModalProps> = ({
     setUploadMessage('');
 
     try {
-      // 1. Obtain verified admin token
-      const token = (await auth?.currentUser?.getIdToken()) || (user?.isAdmin ? 'admin-secret-dev-token' : '');
+      // 1. Obtain verified admin token from active Firebase session
+      const token = await auth?.currentUser?.getIdToken();
+      if (!token) {
+        setUploadMessage('Debes iniciar sesión con una cuenta de Administrador para subir imágenes.');
+        setIsUploading(false);
+        return;
+      }
       
       // 2. Call Vercel Serverless Function /api/s3-presign with Bearer Auth
       const presignRes = await fetch('/api/s3-presign', {
@@ -77,29 +80,41 @@ export const AdminProductModal: React.FC<AdminProductModalProps> = ({
         },
         body: JSON.stringify({ 
           fileName: file.name, 
-          fileType: file.type,
-          fileSize: file.size
+          fileType: file.type
         }),
       });
 
       if (presignRes.ok) {
-        const { uploadUrl, fileUrl, mode } = await presignRes.json();
+        const data = await presignRes.json();
+        const { url, fields, fileUrl, mode } = data;
         
-        if (mode === 'real' && uploadUrl && fileUrl) {
-          // Perform authentic PUT request to AWS S3 bucket
-          const putRes = await fetch(uploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': file.type },
-            body: file,
+        if (mode === 'real' && url && fields) {
+          // Perform authentic multipart POST request to AWS S3 bucket with S3-enforced content-length-range
+          const formData = new FormData();
+          Object.entries(fields).forEach(([k, v]) => {
+            formData.append(k, v as string);
+          });
+          formData.append('file', file);
+
+          const uploadRes = await fetch(url, {
+            method: 'POST',
+            body: formData,
           });
 
-          if (putRes.ok) {
+          if (uploadRes.ok || uploadRes.status === 204) {
             setImageUrl(fileUrl);
             setUploadSuccess(true);
-            setUploadMessage('¡Archivo subido exitosamente a AWS S3!');
+            setUploadMessage('¡Archivo subido exitosamente a AWS S3 con política de tamaño verificada!');
+            return;
+          } else {
+            setUploadMessage('AWS S3 rechazó la carga: verifique el tamaño (máximo 5 MB) y formato.');
             return;
           }
         }
+      } else {
+        const errorData = await presignRes.json().catch(() => ({}));
+        setUploadMessage(errorData.error || 'Error de autorización en endpoint S3.');
+        return;
       }
 
       // Safe demo simulation fallback when AWS credentials are not active
