@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, CheckCircle, ShieldCheck } from 'lucide-react';
+import { X, CheckCircle, ShieldCheck, AlertCircle } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
 import { OrderService } from '../services/orderService';
@@ -24,6 +24,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [postalCode, setPostalCode] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -32,6 +33,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (!user) return;
 
     setIsProcessing(true);
+    setErrorMessage(null);
     try {
       const order = await OrderService.createOrder({
         userId: user.uid,
@@ -50,8 +52,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       clearCart();
       setCompletedOrder(order.id);
       onOrderSuccess(order.id);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error confirming order:', err);
+      setErrorMessage(err?.message || 'Error al procesar la orden de compra.');
     } finally {
       setIsProcessing(false);
     }
@@ -92,6 +95,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           ) : (
             <form onSubmit={handleConfirmOrder} className="space-y-5">
+              {errorMessage && (
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-red-900">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
               <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900">
                 <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <span>

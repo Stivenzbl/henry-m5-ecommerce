@@ -20,10 +20,15 @@ service cloud.firestore {
 
     // Products collection:
     // Anyone (even unauthenticated visitors) can read products.
-    // Only verified administrators with Custom Claim can create, update, or delete.
+    // Only verified administrators with Custom Claim can create, update catalog fields, or delete.
+    // Authenticated users can only submit reviews and update aggregate ratings.
     match /products/{productId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviews', 'rating', 'ratingCount'])
+      );
 
       // Subcollection: Product reviews
       match /reviews/{reviewId} {
@@ -35,7 +40,8 @@ service cloud.firestore {
           request.resource.data.rating <= 5 &&
           request.resource.data.comment is string &&
           request.resource.data.comment.size() >= 3 &&
-          request.resource.data.comment.size() <= 1000;
+          request.resource.data.comment.size() <= 1000 &&
+          request.resource.data.keys().hasOnly(['id', 'productId', 'userId', 'userName', 'rating', 'comment', 'createdAt', 'isVerifiedBuyer']);
         allow update, delete: if isAdmin() || isOwner(resource.data.userId);
       }
     }
@@ -45,7 +51,9 @@ service cloud.firestore {
     // SEC-01 HARDENING: Prevent self-promotion. Role field is strictly locked.
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role == 'customer');
+      allow create: if isOwner(userId) && 
+        (!('role' in request.resource.data) || request.resource.data.role == 'customer') &&
+        request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'createdAt', 'updatedAt']);
       allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'admin'])) || isAdmin();
       allow delete: if isAdmin();
     }
@@ -64,7 +72,8 @@ service cloud.firestore {
         request.resource.data.totalQuantity is int &&
         request.resource.data.totalQuantity > 0 &&
         request.resource.data.shippingAddress is map &&
-        request.resource.data.createdAt is string;
+        request.resource.data.createdAt is string &&
+        request.resource.data.keys().hasOnly(['userId', 'userEmail', 'items', 'totalPrice', 'totalQuantity', 'status', 'shippingAddress', 'createdAt']);
       allow update: if isAdmin(); // Only admins can transition order statuses
       allow delete: if isAdmin();
     }
